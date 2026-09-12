@@ -170,10 +170,15 @@ def _build_workflow(prompt: str, width: int, height: int, frames: int,
                           "format": "video/h264-mp4", "pingpong": False,
                           "save_output": True}},
     }
+    # Autogrow wire format: sub-inputs nest under the parent key as a dict
+    # (`ref_images: {"ref_image_0": [loadimage_id, 0]}`), not as flat siblings.
+    ref_map: dict[str, Any] = {}
     for i, name in enumerate(ref_files[:9]):
         nid = str(40 + i)
         wf[nid] = {"class_type": "LoadImage", "inputs": {"image": name}}
-        wf["7"]["inputs"][f"ref_image_{i}"] = [nid, 0]
+        ref_map[f"ref_image_{i}"] = [nid, 0]
+    if ref_map:
+        wf["7"]["inputs"]["ref_images"] = ref_map
     return wf
 
 
