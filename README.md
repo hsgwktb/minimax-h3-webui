@@ -129,12 +129,43 @@ Then write the printed `https://*.trycloudflare.com` into this repo's
 `api.json` (`{"base": "..."}`). The page reads `api.json` on load, so a new
 tunnel URL only needs that one file updated.
 
+## Settings (gear) — Cache-DiT acceleration
+
+The toolbar's gear button opens a small settings dialog. Its one switch,
+**Cache-DiT 加速**, is **on by default** and is a real per-request SGLang
+switch (`enable_cache_dit`), mounted/unmounted lazily at the batch boundary —
+toggling it needs no model reload.
+
+Cache-DiT is *lossy*: it reuses DiT blocks whose residual between adjacent
+denoising steps is small (DBCache) instead of recomputing them.
+
+Measured on this deployment (768P, 4 s, 4 steps, one L4):
+
+| Cache-DiT | DBCache config | Denoise | Total inference |
+| --- | --- | ---: | ---: |
+| off | — | 147.1 s | 193.3 s |
+| on | `W=1 R=0.24` (library defaults scaled) | 147.4 s | 194.6 s |
+| on | `W=1 R=0.6` (**gateway default**) | 99.2 s | **146.7 s** |
+
+The library's default residual threshold (0.24) never triggers on a short
+schedule, which makes the switch look inert. The gateway therefore applies
+`max_warmup_steps = clamp(steps // 4, 1, 4)`, `residual_diff_threshold = 0.6`
+and `max_continuous_cached_steps = 3` whenever the switch is on, unless the
+client supplies explicit `cache_dit_params` (accepted keys:
+`Fn_compute_blocks`, `Bn_compute_blocks`, `max_warmup_steps`,
+`residual_diff_threshold`, `max_continuous_cached_steps`, `enable_taylorseer`,
+`taylorseer_order`, `scm_*`).
+
+Note: sending `quality` on the request selects H3's own `"high"` cache mode and
+suppresses the generic Cache-DiT path, so the gateway only forwards `quality`
+when the switch is off.
+
 ## API (gateway)
 
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/api/health` | gateway + sglang + GPU |
-| POST | `/api/generate` | `{prompt, short_edge, aspect_ratio, duration_seconds, num_inference_steps, conditions[]}` |
+| POST | `/api/generate` | `{prompt, short_edge, aspect_ratio, duration_seconds, num_inference_steps, conditions[], enable_cache_dit, cache_dit_params?}` |
 | GET | `/api/status/{id}` | job status/progress |
 | GET | `/api/video/{id}` | finished MP4 |
 | POST | `/api/upload` | image → `file://` URI for keyframe conditioning |
