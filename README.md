@@ -184,3 +184,88 @@ Only the first reference job pays the reload cost.
 - Generation is slow: ~48 s/step at 1344×768 on one L4 (streamed weights).
 - The loader patch and `/content/h3` live only inside the Colab VM — a runtime
   restart requires re-running sections 2–6.
+
+---
+
+# Backend B: ComfyUI (Latent 双采样)
+
+The same web UI also runs against a **ComfyUI** backend that replicates the
+community *Latent 双采样 / 显存终极优化* recipe: **stage-1 sample at low
+resolution → 3D latent upscale (×1.5) → stage-2 sample**, on a **hybrid
+fl2va+ref2va int8 DiT** with a **4-step Turbo LoRA**.
+
+| | SGLang variant (above) | ComfyUI variant (this section) |
+| --- | --- | --- |
+| Backend | `sglang serve` (RunningHub snapshot) | ComfyUI 0.5.x + 2 public node packs |
+| DiT weights | GGUF Q4_K_M 18.8 GB | hybrid **int8 ConvRot** 20.97 GB |
+| Text encoder | GGUF Q4_K_M 18.2 GB | int8 ConvRot 27.1 GB |
+| Sampling | single pass | **low-res → latent ×1.5 → high-res** |
+| Step distillation | ✗ GGUF cannot take a LoRA | ✓ 4-step Turbo LoRA @ 0.75 |
+| fl2va vs ref2va | mutually exclusive, swapped on demand (~6 min) | **one hybrid model serves both — no switching** |
+| VRAM strategy | layerwise offload from host/disk | ComfyUI dynamic VRAM + upscaler `force_unload` |
+| Peak VRAM | 11.3–15.6 GB | ~18.9 GB of 23 GB |
+| 4 s @ 768P | 145–193 s | **371 s** (VHS encodes at crf 19 → ~4.4 MB, higher quality) |
+
+Setup: `deploy-comfyui/setup.sh` (one shot). Gateway:
+`deploy-comfyui/comfy_gateway.py`, started with
+`uvicorn comfy_gateway:app --host 127.0.0.1 --port 8000`. It exposes the **same
+API contract** as the SGLang gateway, so `index.html` is unchanged — only
+`api.json` needs to point at the new tunnel.
+
+The graph it submits (built in `_build_workflow`) is:
+
+```
+UNETLoader(hybrid int8) → LoraLoaderModelOnly(Turbo 0.75) → MiniMaxH3SigmaShift(6/3)
+CLIPLoader(int8 qwen3vl, type=minimax)
+MiniMaxH3ReferenceToVideo(prompt,width,height,length,ref_images) → positive + AV latent
+BasicScheduler(simple) → H3SigmaRefiner(+1) → SplitSigmas(mid)
+  stage 1: SamplerCustomAdvanced(high sigmas, low-res latent)
+  → LTXVSeparateAVLatent → MinimaxH3LatentUpscaler3D(×1.5, align 32, temporal chunking)
+  → LTXVConcatAVLatent → stage 2: SamplerCustomAdvanced(low sigmas)
+  → VAEDecode + VAEDecodeAudio → VHS_VideoCombine(h264-mp4, 24 fps)
+```
+
+The `768P` in the UI means the **output** size; stage 1 runs at `768/1.5 ≈ 512`
+short edge (aligned to 32), which the upscaler log confirms:
+`Latent 56x32 -> 84x48 | Pixels 1344x768 | scale=1.500`.
+
+## Two wire-format gotchas (each cost one failed run)
+
+ComfyUI's V3 *dynamic* inputs do not take the shape you would guess from a UI
+workflow:
+
+* **DynamicCombo** (`MinimaxH3LatentUpscaler3D.mode`) — the selected key goes in
+  the input itself, its sub-inputs as **dot-prefixed siblings**:
+  ```json
+  "mode": "scale by multiplier", "mode.scale": 1.5
+  ```
+  Passing `{"mode": "scale by multiplier", "scale": 1.5}` fails with
+  `execute() missing 1 required positional argument: 'mode'`.
+* **Autogrow** (`MiniMaxH3ReferenceToVideo.ref_images`) — **nest under the
+  parent key**:
+  ```json
+  "ref_images": {"ref_image_0": ["40", 0], "ref_image_1": ["41", 0]}
+  ```
+  Flat `ref_image_0` keys fail with
+  `unexpected keyword argument 'ref_image_0'. Did you mean 'ref_images'?`.
+
+The reference in `comfy_api/latest/_io.py::_expand_schema_for_dynamic` is the
+authority for the first one; `io.Autogrow.TemplatePrefix` for the second.
+
+## Not reproducible: four VRAM nodes
+
+The original workflow also used `MiniMaxLowVRAMAttention`,
+`MiniMaxChunkFeedForward`, `ReservedVRAMSetter` and
+`MiniMaxH3MemoryEfficientSageAttentionPatch`. **None of these exist in either
+public node pack** (the ones the tutorial points at contain
+`H3DistanceAttentionPatcher`, `H3TiledSampler`, `H3DynamicCFGScheduler`,
+`H3PromptRelay`, `H3SigmaRefiner` from YCNodes, and `MMH3SplitUpscale`,
+`MMH3SpatialSplitTemporalParamsV10`, `MinimaxH3LatentUpscaler2D/3D` from the
+upscaler pack). So that part of the recipe cannot be reproduced as written;
+ComfyUI's dynamic VRAM loading plus the upscaler's `force_unload`
+(logs `✅ Model offloaded to CPU. VRAM released.`) cover the VRAM side instead.
+
+Also skipped: `taeh3.safetensors` (preview-only TAE used by
+`ModelPreviewOverrideKJ`, which comes from KJNodes — the preview override is not
+needed for generation).
+
