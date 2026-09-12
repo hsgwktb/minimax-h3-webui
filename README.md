@@ -151,9 +151,10 @@ How the swap works:
   shared local root (`--model-variant` makes SGLang resolve `FL2VA/` or
   `Ref2VA/` inside it).
 - `switch_variant.sh <variant>` kills the current server, starts the other, and
-  polls `/health` until it returns 200 (loading + warmup, ~3–5 min). It writes
+  polls `/health` until it returns 200. It writes
   `/content/h3/variant.json` = `{current, state: switching|ready|error, target}`
-  as it goes.
+  as it goes. **Measured swap cost: 376 s (~6.3 min)** for `fl2va → ref2va`
+  (load + warmup).
 - The gateway reads that file and reloads *lazily on demand*: a request whose
   conditions include `role: "reference"` needs `ref2va`, so `/api/generate`
   returns `{"switching": true, "target": "ref2va"}` (HTTP 202) instead of
