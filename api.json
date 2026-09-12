@@ -1,1 +1,6 @@
-{"base": ""}
+{
+ "base": "https://apartments-gabriel-time-inform.trycloudflare.com",
+ "model": "MiniMaxAI/MiniMax-H3",
+ "note": "Colab L4 · quantized GGUF",
+ "updated": 1789208457.8993342
+}
