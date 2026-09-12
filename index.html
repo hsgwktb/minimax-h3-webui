@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>METASO AI 视频生成器 · MiniMax H3</title>
+<style>
+:root{
+  --bg:#0c0c0f; --bg2:#111116; --card:#15151b; --card2:#1a1a21;
+  --line:#26262e; --line2:#33333d;
+  --tx:#ececf2; --tx2:#a9a9b6; --tx3:#6d6d7a;
+  --blue:#2f6bff; --blue2:#1f56e0; --purple:#7c5cff; --orange:#ff8a3d;
+  --ok:#2ecc71; --warn:#f5b83d; --err:#ff5c5c;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--tx);
+  font-family:"Inter","PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit}
+/* ---------- header ---------- */
+header{height:54px;display:flex;align-items:center;gap:18px;padding:0 20px;
+  border-bottom:1px solid var(--line);background:#0e0e12;position:sticky;top:0;z-index:50}
+.logo{font-size:19px;font-weight:800;letter-spacing:.5px}
+.promo{flex:1;display:flex;justify-content:center}
+.promo-inner{display:flex;align-items:center;gap:10px;font-size:13px;color:#e9d9c8}
+.promo .cut{background:linear-gradient(180deg,#ffb066,#ff7a1f);color:#3a1c00;font-weight:800;
+  padding:2px 8px;border-radius:6px;font-size:12px}
+.promo .hl{color:#ffb066;font-weight:700}
+.promo .sep{color:#4a4a55}
+nav{display:flex;align-items:center;gap:6px}
+nav a{padding:7px 12px;border-radius:8px;font-size:13px;color:var(--tx2)}
+nav a:hover{background:#1b1b22;color:var(--tx)}
+nav a.cta{border:1px solid var(--line2);color:var(--tx)}
+.avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#3d6bff,#8b5cff);
+  margin-left:8px}
+/* ---------- layout ---------- */
+main{display:grid;grid-template-columns:452px 1fr;gap:20px;padding:20px;align-items:start}
+@media (max-width:1100px){main{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px}
+/* ---------- left form ---------- */
+.form{padding:16px}
+.seg{display:flex;gap:8px;background:#101015;padding:4px;border-radius:10px;margin-bottom:18px}
+.seg button{flex:1;background:transparent;border:0;color:var(--tx2);padding:9px 0;border-radius:8px;
+  font-size:13.5px;cursor:pointer}
+.seg button.on{background:var(--blue);color:#fff;font-weight:600}
+.seg button:disabled{opacity:.42;cursor:not-allowed}
+.lbl{display:flex;align-items:center;gap:6px;font-size:13.5px;color:var(--tx);margin:0 0 9px;font-weight:600}
+.lbl .hint{font-size:11.5px;color:var(--tx3);font-weight:400;margin-left:auto}
+.lbl .i{width:14px;height:14px;border-radius:50%;border:1px solid var(--line2);color:var(--tx3);
+  font-size:10px;display:inline-flex;align-items:center;justify-content:center;cursor:help}
+.ta{position:relative;background:#101015;border:1px solid var(--line);border-radius:10px;padding:12px}
+.ta textarea{width:100%;height:132px;background:transparent;border:0;outline:0;resize:vertical;
+  color:var(--tx);font-size:13.5px;line-height:1.7;font-family:inherit}
+.ta textarea::placeholder{color:var(--tx3)}
+.ta .count{position:absolute;right:12px;bottom:8px;font-size:11.5px;color:var(--tx3)}
+.drop{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.slot{position:relative;height:104px;border:1px dashed var(--line2);border-radius:10px;background:#101015;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  color:var(--tx3);font-size:12.5px;cursor:pointer;overflow:hidden}
+.slot:hover{border-color:#4a4a58;color:var(--tx2)}
+.slot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.slot .x{position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;
+  background:rgba(0,0,0,.65);color:#fff;font-size:12px;display:none;align-items:center;
+  justify-content:center;z-index:2}
+.slot.has img{display:block}
+.slot.has .x{display:flex}
+.slot .ic{width:26px;height:26px;opacity:.8}
+.row{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.row .k{font-size:13px;color:var(--tx2);width:56px;flex:none}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{padding:7px 14px;border-radius:9px;background:#101015;border:1px solid var(--line);
+  color:var(--tx2);font-size:12.5px;cursor:pointer}
+.chip.on{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
+.chip:disabled{opacity:.35;cursor:not-allowed;text-decoration:line-through}
+.range{flex:1;display:flex;align-items:center;gap:12px}
+input[type=range]{-webkit-appearance:none;appearance:none;flex:1;height:4px;border-radius:3px;
+  background:linear-gradient(90deg,var(--blue) var(--p,40%),#2a2a33 var(--p,40%));outline:0}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;
+  background:#fff;border:3px solid var(--blue);cursor:pointer}
+.range .v{font-size:12.5px;color:var(--tx);min-width:42px;text-align:right}
+.range .end{font-size:12px;color:var(--tx3)}
+.create{width:100%;margin-top:6px;height:46px;border:0;border-radius:11px;background:var(--blue);
+  color:#fff;font-size:15px;font-weight:700;cursor:pointer}
+.create:hover{background:var(--blue2)}
+.create:disabled{opacity:.5;cursor:progress}
+.formnote{margin-top:10px;font-size:11.5px;color:var(--tx3);line-height:1.7}
+/* ---------- right ---------- */
+.right{display:flex;flex-direction:column;gap:16px;min-height:600px}
+.toolbar{display:flex;align-items:center;gap:8px;padding:9px 12px}
+.tb{display:flex;align-items:center;gap:6px;padding:7px 11px;border-radius:9px;background:transparent;
+  border:1px solid transparent;color:var(--tx2);font-size:13px;cursor:pointer}
+.tb:hover{background:#1b1b22;color:var(--tx)}
+.tb.b{border-color:var(--line)}
+.tb.dl{margin-left:auto;background:var(--purple);color:#fff;font-weight:600;border:0}
+.tb.dl:hover{background:#6a49f0}
+.gallery{flex:1;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;
+  padding:0 12px 16px}
+.card{background:var(--card2);border:1px solid var(--line);border-radius:12px;overflow:hidden;
+  display:flex;flex-direction:column}
+.card .head{display:flex;align-items:center;gap:8px;padding:11px 12px}
+.card .title{flex:1;font-size:13.5px;font-weight:600;color:var(--tx);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.card .icobtn{width:26px;height:26px;border-radius:7px;background:#22222b;border:0;color:var(--tx2);
+  cursor:pointer;font-size:12px}
+.card video{width:100%;display:block;background:#000;aspect-ratio:16/9}
+.card .meta{padding:8px 12px;font-size:11.5px;color:var(--tx3);display:flex;gap:12px;flex-wrap:wrap}
+.stage{padding:14px}
+.bar{height:6px;border-radius:4px;background:#22222b;overflow:hidden;margin:10px 0 8px}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#2f6bff,#7c5cff);
+  transition:width .5s}
+.stage .line{font-size:12.5px;color:var(--tx2)}
+.stage .sub{font-size:11.5px;color:var(--tx3);margin-top:6px;white-space:pre-wrap;max-height:110px;
+  overflow:auto;font-family:ui-monospace,Consolas,monospace}
+.empty{border:1px dashed var(--line2);border-radius:12px;padding:46px 20px;text-align:center;
+  color:var(--tx3);font-size:13px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;
+  background:#1b1b22;font-size:11.5px;color:var(--tx2)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--tx3)}
+.dot.ok{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.dot.bad{background:var(--err)}
+.dot.busy{background:var(--warn)}
+.settings{display:flex;align-items:center;gap:8px;padding:0 12px 14px;font-size:12px;color:var(--tx3)}
+.settings input{flex:1;background:#101015;border:1px solid var(--line);border-radius:8px;color:var(--tx2);
+  padding:7px 10px;font-size:12px;outline:0}
+.settings button{background:#22222b;border:0;color:var(--tx2);border-radius:8px;padding:7px 12px;
+  font-size:12px;cursor:pointer}
+.err{color:var(--err);font-size:12.5px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">METASO</div>
+  <div class="promo"><div class="promo-inner">
+    <span class="cut">2折</span><span>MiniMax 官方价 <b class="hl">2 折</b></span>
+    <span class="sep">|</span><span>一分时代 · 低至 <b class="hl">0.09 元/秒</b></span>
+    <span class="sep">|</span><span>本地部署 · L4 · 随开随用</span>
+  </div></div>
+  <nav>
+    <a href="#" onclick="return false">H3教程</a>
+    <a href="#" onclick="return false">New API接入</a>
+    <a class="cta" href="#" onclick="return false">API</a>
+    <a href="#" onclick="return false">控制台</a>
+    <div class="avatar"></div>
+  </nav>
+</header>
+
+<main>
+  <!-- ============ left : form ============ -->
+  <section class="panel form">
+    <div class="seg">
+      <button id="tab-t2v" class="on">文/图生视频</button>
+      <button id="tab-ref" disabled title="需要 ref2va 分区，当前实例为 fl2va">多参考</button>
+    </div>
+
+    <div class="lbl">提示词 <span class="i" title="描述画面、镜头与声音。H3 同时生成画面与立体声。">i</span>
+      <span class="hint">模型：MiniMax-H3 · 量化 GGUF</span></div>
+    <div class="ta">
+      <textarea id="prompt" maxlength="7000"
+        placeholder="描述您想要的内容。例如：夜晚，三只小猫吹着小铜管乐器列队行进，随后迅速离开。"></textarea>
+      <div class="count"><span id="cc">0</span>/7000</div>
+    </div>
+
+    <div class="lbl" style="margin-top:18px">图片 <span class="hint">设置首帧和末帧，控制视频的开始与结束</span></div>
+    <div class="drop">
+      <label class="slot" id="slot-0">
+        <input type="file" accept="image/*" hidden>
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+          <rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/>
+          <path d="M4 18l5-5 4 4 3-3 4 4"/></svg>
+        <span>起始帧</span><span class="x">×</span></label>
+      <label class="slot" id="slot-1">
+        <input type="file" accept="image/*" hidden>
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+          <rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/>
+          <path d="M4 18l5-5 4 4 3-3 4 4"/></svg>
+        <span>结束帧</span><span class="x">×</span></label>
+    </div>
+
+    <div class="row"><span class="k">分辨率</span>
+      <div class="chips">
+        <button class="chip on" data-res="768">768P</button>
+        <button class="chip" data-res="2k" disabled title="MiniMax-H3 原生输出为 768p 短边">2K</button>
+      </div></div>
+
+    <div class="row"><span class="k">时长</span>
+      <div class="range">
+        <span class="end">4 秒</span>
+        <input id="dur" type="range" min="4" max="15" step="1" value="4">
+        <span class="v" id="durv">4 秒</span>
+        <span class="end">15 秒</span>
+      </div></div>
+
+    <div class="row" style="align-items:flex-start"><span class="k" style="padding-top:7px">画面比例</span>
+      <div class="chips" id="aspect">
+        <button class="chip" data-a="auto">自动</button>
+        <button class="chip" data-a="21:9">21:9</button>
+        <button class="chip on" data-a="16:9">16:9</button>
+        <button class="chip" data-a="4:3">4:3</button>
+        <button class="chip" data-a="1:1">1:1</button>
+        <button class="chip" data-a="3:4">3:4</button>
+        <button class="chip" data-a="9:16">9:16</button>
+      </div></div>
+
+    <div class="row"><span class="k">步数</span>
+      <div class="chips" id="steps">
+        <button class="chip" data-s="4">快速 4</button>
+        <button class="chip on" data-s="8">标准 8</button>
+        <button class="chip" data-s="16">精细 16</button>
+      </div></div>
+
+    <button class="create" id="go">创建</button>
+    <div class="formnote">
+      L4 24GB + layerwise offload：权重自磁盘流式加载，首次出片较慢（数分钟到十几分钟）。
+      生成期间请保持本页面打开。
+    </div>
+  </section>
+
+  <!-- ============ right : gallery ============ -->
+  <section class="right">
+    <div class="panel">
+      <div class="toolbar">
+        <button class="tb b">分组筛选 ▾</button>
+        <button class="tb">🗑 回收站</button>
+        <button class="tb">▦ 分组管理</button>
+        <button class="tb">▤ 资产库</button>
+        <button class="tb">☆ 只看星标</button>
+        <button class="tb dl">⤓ 批量下载</button>
+      </div>
+      <div class="settings">
+        <span class="pill" id="health"><span class="dot" id="hdot"></span><span id="htxt">连接中…</span></span>
+        <input id="base" placeholder="后端地址（api.json 或手动填写）">
+        <button id="saveBase">保存</button>
+      </div>
+    </div>
+    <div class="gallery" id="gallery">
+      <div class="empty" id="empty">还没有生成记录 —— 填写左侧提示词，点击「创建」开始。</div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const S = { res:768, aspect:'16:9', steps:8, dur:4, base:'', jobs:new Map() };
+
+/* ---------------- base url ---------------- */
+async function initBase(){
+  const saved = localStorage.getItem('h3.base');
+  let fromFile = '';
+  try{
+    const r = await fetch('api.json?t='+Date.now(), {cache:'no-store'});
+    if(r.ok){ const j = await r.json(); fromFile = (j.base||'').replace(/\/$/,''); }
+  }catch(e){}
+  S.base = saved || fromFile || '';
+  $('#base').value = S.base;
+  health();
+}
+$('#saveBase').onclick = ()=>{ S.base = $('#base').value.trim().replace(/\/$/,'');
+  localStorage.setItem('h3.base', S.base); health(); };
+
+async function health(){
+  const dot = $('#hdot'), txt = $('#htxt');
+  if(!S.base){ dot.className='dot bad'; txt.textContent='未配置后端地址'; return; }
+  dot.className='dot busy'; txt.textContent='检测中…';
+  try{
+    const r = await fetch(S.base+'/api/health', {cache:'no-store'});
+    const j = await r.json();
+    const up = j.sglang && j.sglang.reachable;
+    dot.className = 'dot ' + (up?'ok':'bad');
+    txt.textContent = up ? ('在线 · '+(j.gpu||'L4')) : '后端在线，模型未就绪';
+  }catch(e){ dot.className='dot bad'; txt.textContent='无法连接后端'; }
+}
+
+/* ---------------- form state ---------------- */
+$('#prompt').addEventListener('input', e => $('#cc').textContent = e.target.value.length);
+function group(sel, cb){
+  document.querySelectorAll(sel).forEach(b => b.onclick = () => {
+    if(b.disabled) return;
+    document.querySelectorAll(sel).forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); cb(b);
+  });
+}
+group('[data-res]', b => S.res = b.dataset.res==='2k' ? 1344 : 768);
+group('#aspect .chip', b => S.aspect = b.dataset.a);
+group('#steps .chip', b => S.steps = +b.dataset.s);
+$('#dur').addEventListener('input', e => {
+  S.dur = +e.target.value; $('#durv').textContent = S.dur+' 秒';
+  e.target.style.setProperty('--p', ((S.dur-4)/11*100)+'%');
+});
+
+/* ---------------- image slots ---------------- */
+const conds = {};
+document.querySelectorAll('.slot').forEach(slot => {
+  const idx = slot.id === 'slot-0' ? 0 : -1;   // 0 = first frame, -1 = last frame
+  const input = slot.querySelector('input');
+  slot.querySelector('.x').onclick = e => {
+    e.preventDefault(); e.stopPropagation();
+    delete conds[idx]; slot.classList.remove('has');
+    const im = slot.querySelector('img'); if(im) im.remove();
+    input.value = '';
+  };
+  input.onchange = async () => {
+    const f = input.files[0]; if(!f) return;
+    if(!S.base){ alert('请先配置后端地址'); return; }
+    const fd = new FormData(); fd.append('file', f);
+    slot.querySelector('span:last-child').textContent = '上传中…';
+    try{
+      const r = await fetch(S.base+'/api/upload', {method:'POST', body:fd});
+      const j = await r.json();
+      if(j.uri){
+        conds[idx] = {type:'image', uri:j.uri, role:'keyframe', frame_index:idx};
+        slot.classList.add('has');
+        let im = slot.querySelector('img'); if(!im){ im=document.createElement('img'); slot.appendChild(im); }
+        im.src = URL.createObjectURL(f);
+      } else { alert(j.error||'上传失败'); }
+    }catch(e){ alert('上传失败: '+e); }
+    slot.querySelector('span:last-child').textContent = idx===0?'起始帧':'结束帧';
+  };
+});
+
+/* ---------------- generate ---------------- */
+$('#go').onclick = async () => {
+  const prompt = $('#prompt').value.trim();
+  if(!prompt){ $('#prompt').focus(); return; }
+  if(!S.base){ alert('请先在上方填写后端地址（api.json 未就绪时可手动填写隧道地址）'); return; }
+  const btn = $('#go'); btn.disabled = true; btn.textContent = '提交中…';
+  const id = 'local-'+Date.now();
+  const card = makeCard(id, prompt);
+  try{
+    const payload = {
+      prompt, short_edge:S.res, aspect_ratio:S.aspect,
+      duration_seconds:S.dur, num_inference_steps:S.steps,
+      conditions:Object.values(conds),
+    };
+    const r = await fetch(S.base+'/api/generate', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)});
+    const j = await r.json();
+    if(j.error){ fail(card, j.error + (j.detail?(' — '+String(j.detail).slice(0,200)):'')); }
+    else { card.dataset.vid = j.id; S.jobs.set(j.id, card); poll(j.id, card, payload); }
+  }catch(e){ fail(card, '提交失败: '+e); }
+  finally{ btn.disabled = false; btn.textContent = '创建'; }
+};
+
+function makeCard(key, prompt){
+  $('#empty')?.remove();
+  const el = document.createElement('div'); el.className='card'; el.id='card-'+key;
+  el.innerHTML = `
+    <div class="head"><div class="title"></div>
+      <button class="icobtn" title="重命名">✎</button>
+      <button class="icobtn" title="收藏">☆</button></div>
+    <div class="body"></div>`;
+  el.querySelector('.title').textContent = prompt.slice(0,40) || '未命名';
+  el.querySelector('.body').innerHTML = `
+    <div class="stage">
+      <div class="line"><span class="st">已提交，排队中…</span></div>
+      <div class="bar"><i></i></div>
+      <div class="sub"></div>
+    </div>`;
+  $('#gallery').prepend(el);
+  return el;
+}
+
+function setStage(card, pct, line, sub){
+  const bar = card.querySelector('.bar i'); if(bar) bar.style.width = pct+'%';
+  const st = card.querySelector('.st'); if(st) st.textContent = line;
+  if(sub !== undefined){ const s = card.querySelector('.sub'); if(s) s.textContent = sub; }
+}
+
+async function poll(vid, card, payload){
+  const t0 = Date.now();
+  let log = [];
+  while(true){
+    await new Promise(r=>setTimeout(r, 3000));
+    let j;
+    try{
+      const r = await fetch(S.base+'/api/status/'+vid, {cache:'no-store'});
+      j = await r.json();
+    }catch(e){ log.push('轮询失败，重试…'); continue; }
+    if(j.error){ log.push('err: '+String(j.error).slice(0,160)); }
+    const el = ((Date.now()-t0)/1000).toFixed(0);
+    const pct = Math.max(2, Math.min(97, j.progress|0));
+    const terminal = ['completed','failed','error','cancelled','deleted'].includes(j.status);
+    setStage(card, terminal && j.status==='completed' ? 100 : pct,
+      `生成中 · ${j.status||'queued'} · ${el}s` + (j.progress?` · ${j.progress}%`:''),
+      log.slice(-6).join('\n'));
+    if(j.status==='completed'){
+      card.querySelector('.body').innerHTML =
+        `<video controls autoplay loop playsinline src="${S.base}/api/video/${vid}"></video>
+         <div class="meta">
+           <span>${payload.short_edge}P</span><span>${payload.aspect_ratio}</span>
+           <span>${payload.duration_seconds}s</span><span>${payload.num_inference_steps} steps</span>
+           ${j.inference_time_s?`<span>推理 ${(+j.inference_time_s).toFixed(0)}s</span>`:''}
+           ${j.peak_memory_mb?`<span>峰值 ${(j.peak_memory_mb/1024).toFixed(1)}GB</span>`:''}
+         </div>`;
+      return;
+    }
+    if(['failed','error','cancelled','deleted'].includes(j.status)){
+      fail(card, '生成失败: '+(JSON.stringify(j.error||j.status).slice(0,300)));
+      return;
+    }
+    if((Date.now()-t0) > 3*3600*1000){ fail(card, '超时（>3h）'); return; }
+  }
+}
+
+function fail(card, msg){
+  card.querySelector('.body').innerHTML = `<div class="stage"><div class="err">${msg}</div></div>`;
+}
+
+initBase();
+</script>
+</body>
+</html>
