@@ -173,7 +173,7 @@ Only the first reference job pays the reload cost.
 | GET | `/api/health` | gateway + sglang + GPU |
 | POST | `/api/generate` | `{prompt, short_edge, aspect_ratio, duration_seconds, num_inference_steps, conditions[], enable_cache_dit, cache_dit_params?}` |
 | GET | `/api/status/{id}` | job status/progress |
-| GET | `/api/video/{id}` | finished MP4 |
+| GET | `/api/video/{id}` | finished MP4; Range-aware, and `?download=1` returns `Content-Disposition: attachment` |
 | POST | `/api/upload` | image → `file://` URI for keyframe conditioning |
 
 ## Caveats
