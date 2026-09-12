@@ -104,6 +104,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   cursor:pointer;font-size:12px}
 .card video{width:100%;display:block;background:#000;aspect-ratio:16/9}
 .card .meta{padding:8px 12px;font-size:11.5px;color:var(--tx3);display:flex;gap:12px;flex-wrap:wrap}
+.card .actions{display:flex;gap:8px;padding:0 12px 12px}
+.dlbtn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:0;border-radius:9px;
+  background:#22222b;color:var(--tx);font-size:12.5px;cursor:pointer}
+.dlbtn:hover{background:#2c2c37}
+.dlbtn:disabled{opacity:.55;cursor:progress}
 .stage{padding:14px}
 .bar{height:6px;border-radius:4px;background:#22222b;overflow:hidden;margin:10px 0 8px}
 .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#2f6bff,#7c5cff);
@@ -531,7 +536,12 @@ async function poll(vid, card, payload){
            ${nkf?`<span>关键帧 ×${nkf}</span>`:''}
            ${j.inference_time_s?`<span>推理 ${(+j.inference_time_s).toFixed(0)}s</span>`:''}
            ${j.peak_memory_mb?`<span>峰值 ${(j.peak_memory_mb/1024).toFixed(1)}GB</span>`:''}
+         </div>
+         <div class="actions">
+           <button class="dlbtn">⤓ 下载视频</button>
          </div>`;
+      const dl = card.querySelector('.dlbtn');
+      if(dl) dl.onclick = () => downloadVideo(vid, dl);
       return;
     }
     if(['failed','error','cancelled','deleted'].includes(j.status)){
@@ -539,6 +549,34 @@ async function poll(vid, card, payload){
       return;
     }
     if((Date.now()-t0) > 3*3600*1000){ fail(card, '超时（>3h）'); return; }
+  }
+}
+
+/* Browsers ignore <a download> for cross-origin URLs (this page is on GitHub
+   Pages, the video on the tunnel), so fetch the bytes and save from a Blob. */
+async function downloadVideo(vid, btn){
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = '下载中…';
+  try{
+    const r = await fetch(`${S.base}/api/video/${vid}?download=1`, {cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    const blob = await r.blob();
+    if(!blob.size) throw new Error('响应为空');
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `minimax-h3-${vid.slice(0,8)}.mp4`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    btn.textContent = '已保存';
+    setTimeout(() => { btn.textContent = label; }, 2000);
+  }catch(e){
+    alert('下载失败: ' + e);
+    btn.textContent = label;
+  }finally{
+    btn.disabled = false;
   }
 }
 
