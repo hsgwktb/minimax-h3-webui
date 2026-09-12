@@ -146,9 +146,12 @@ def _build_workflow(prompt: str, width: int, height: int, frames: int,
                           "sigmas": ["11", 0], "latent_image": ["7", 1]}},
         "15": {"class_type": "LTXVSeparateAVLatent", "inputs": {"av_latent": ["14", 0]}},
         # ---- latent upscale (video only; audio rides through) ----
+        # DynamicCombo wire format: the selected option key goes in `mode`, and its
+        # sub-inputs ride as dot-prefixed siblings (`mode.scale`) -- see
+        # comfy_api/latest/_io.py::_expand_schema_for_dynamic.
         "16": {"class_type": "MinimaxH3LatentUpscaler3D",
                "inputs": {"latent": ["15", 0], "model_name": UPSCALER,
-                          "mode": {"mode": "scale by multiplier", "scale": UPSCALE_SCALE},
+                          "mode": "scale by multiplier", "mode.scale": UPSCALE_SCALE,
                           "align": 32, "enable_temporal_chunking": True,
                           "force_unload": True, "device": "cuda", "precision": "fp16"}},
         "17": {"class_type": "LTXVConcatAVLatent",
@@ -248,11 +251,19 @@ async def generate(request: Request) -> JSONResponse:
     if short_edge >= 1344:
         ratio = 1.0
     if ratio >= 1:
-        height, width = short_edge, int(round(short_edge * ratio))
+        final_h, final_w = short_edge, int(round(short_edge * ratio))
     else:
-        width, height = short_edge, int(round(short_edge / ratio))
-    width = max(64, (width // 32) * 32)
-    height = max(64, (height // 32) * 32)
+        final_w, final_h = short_edge, int(round(short_edge / ratio))
+    final_w = max(64, (final_w // 32) * 32)
+    final_h = max(64, (final_h // 32) * 32)
+
+    # The graph samples stage 1 at the *low* resolution and the 3D latent upscaler
+    # multiplies it by UPSCALE_SCALE, so the requested short edge is the OUTPUT size:
+    # stage-1 dims are that divided by the scale (aligned to 32, which the upscaler
+    # requires — align=32 keeps the pixel grid consistent across the jump).
+    low_w = max(64, (int(round(final_w / UPSCALE_SCALE)) // 32) * 32)
+    low_h = max(64, (int(round(final_h / UPSCALE_SCALE)) // 32) * 32)
+    width, height = low_w, low_h
 
     try:
         duration = float(body.get("duration_seconds") or 4.0)
@@ -300,13 +311,14 @@ async def generate(request: Request) -> JSONResponse:
     pid = r.json().get("prompt_id")
     job_id = str(uuid.uuid4())
     JOBS[job_id] = {"prompt_id": pid, "created": time.time(), "params": {
+        "low": f"{width}x{height}", "final": f"{final_w}x{final_h}",
         "width": width, "height": height, "frames": frames, "steps": steps,
         "first_pass": max(1, steps // 2), "seed": seed, "duration": duration,
         "refs": len(ref_files), "aspect": aspect}}
     return JSONResponse({"id": job_id, "object": "video", "status": "queued",
                          "progress": 0, "created_at": int(time.time()),
                          "seconds": str(round(frames / FPS, 3)),
-                         "size": f"{width}x{height}",
+                         "size": f"{final_w}x{final_h}",
                          "_submitted": {"task": "hybrid", "variant": "hybrid",
                                         "seed": seed, "steps": steps,
                                         "short_edge": short_edge, "duration": duration,
