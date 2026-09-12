@@ -289,19 +289,37 @@ def tasks() -> JSONResponse:
 
 
 @app.get("/api/video/{vid}")
-def video(vid: str) -> StreamingResponse:
-    r = requests.get(f"{SGLANG_BASE}/v1/videos/{vid}/content",
-                     stream=True, timeout=600)
-    ctype = r.headers.get("content-type", "video/mp4")
+def video(vid: str, request: Request, download: int = 0) -> StreamingResponse:
+    """Stream a finished MP4.
+
+    Range requests are forwarded so the player can seek, and Content-Length /
+    Content-Range come back verbatim so browsers and download managers can save
+    the file. `?download=1` switches the disposition to attachment — the web UI
+    needs that because it is served from a different origin (GitHub Pages),
+    where a plain <a download> is ignored and the link would merely navigate.
+    """
+    fwd = {}
+    rng = request.headers.get("range")
+    if rng:
+        fwd["Range"] = rng
+    up = requests.get(f"{SGLANG_BASE}/v1/videos/{vid}/content",
+                      headers=fwd, stream=True, timeout=600)
 
     def it():
-        for chunk in r.iter_content(chunk_size=1 << 20):
+        for chunk in up.iter_content(chunk_size=1 << 20):
             if chunk:
                 yield chunk
 
-    headers = {"Content-Disposition": f'inline; filename="{vid}.mp4"'}
+    headers = {"Accept-Ranges": up.headers.get("accept-ranges", "bytes"),
+               "Content-Disposition":
+                   f'{"attachment" if download else "inline"}; '
+                   f'filename="minimax-h3-{vid[:8]}.mp4"'}
+    for h in ("Content-Length", "Content-Range"):
+        if up.headers.get(h):
+            headers[h] = up.headers[h]
+    ctype = up.headers.get("content-type", "video/mp4")
     return StreamingResponse(it(), media_type=ctype, headers=headers,
-                             status_code=r.status_code)
+                             status_code=up.status_code)
 
 
 _SAFE = re.compile(r"[^A-Za-z0-9._-]")
