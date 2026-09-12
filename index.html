@@ -276,8 +276,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
       <div class="opt">
         <div class="txt">
           <div class="t">Cache-DiT 加速 <span class="tag lossy">有损</span></div>
-          <div class="d">跳过部分 DiT block 的重复计算，并把跳过的 block 留在主机内存不参与流式加载，
-            明显缩短生成时间；代价是细节与运动连续性会略有下降。</div>
+          <div class="d">复用相邻去噪步中变化很小的 block（DBCache），跳过的 block 不再重复计算。
+            实测 4 步任务总耗时 193s → 147s（约 25%）；代价是细节与运动连续性可能略有下降。</div>
         </div>
         <button class="sw" id="swCacheDit" role="switch" aria-checked="true"></button>
       </div>
