@@ -194,8 +194,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
           <button class="chip" data-n="4">4 个</button>
         </div></div>
       <div class="drop" id="refdrop"></div>
-      <div class="formnote" style="margin:0 0 14px">「多参考」由 ref2va 分区提供，与 fl2va 互斥：
-        首次提交会自动重新加载分区（实测约 6 分钟），之后一直复用。</div>
+      <div class="formnote" style="margin:0 0 14px">当前后端为混合模型（fl2va + ref2va 合一），
+        参考图与文生视频共用一次加载，无需切换分区。</div>
     </div>
 
     <div class="row"><span class="k">分辨率</span>
@@ -232,8 +232,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 
     <button class="create" id="go">创建</button>
     <div class="formnote">
-      L4 24GB + layerwise offload：权重自磁盘流式加载，首次出片较慢（数分钟到十几分钟）。
-      生成期间请保持本页面打开。
+      后端：ComfyUI · 混合 int8 模型 + Turbo LoRA + Latent 双采样（低分辨率一采样 → 3D latent 放大 →
+      二采样）。L4 24GB 上首次出片较慢（数分钟到十几分钟），生成期间请保持本页面打开。
     </div>
   </section>
 
