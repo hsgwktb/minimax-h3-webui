@@ -126,6 +126,34 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .settings button{background:#22222b;border:0;color:var(--tx2);border-radius:8px;padding:7px 12px;
   font-size:12px;cursor:pointer}
 .err{color:var(--err);font-size:12.5px}
+/* ---------- settings gear + modal ---------- */
+.gear{font-size:16px;line-height:1;padding:6px 10px}
+.gear:hover{background:#22222b;color:var(--tx)}
+.mask{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-start;
+  justify-content:center;z-index:100;padding-top:12vh}
+.mask.on{display:flex}
+.modal{width:380px;max-width:92vw;background:var(--card);border:1px solid var(--line2);
+  border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.6);overflow:hidden}
+.modal .mh{display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);
+  font-size:14px;font-weight:700}
+.modal .mh .x{margin-left:auto;background:transparent;border:0;color:var(--tx3);font-size:17px;
+  cursor:pointer;line-height:1;padding:2px 4px}
+.modal .mh .x:hover{color:var(--tx)}
+.modal .mb{padding:6px 16px 16px}
+.opt{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
+.opt:last-child{border-bottom:0}
+.opt .txt{flex:1}
+.opt .t{font-size:13.5px;color:var(--tx);font-weight:600}
+.opt .d{font-size:11.5px;color:var(--tx3);margin-top:4px;line-height:1.6}
+.sw{flex:none;width:42px;height:24px;border-radius:14px;background:#33333d;border:0;position:relative;
+  cursor:pointer;transition:background .18s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;
+  background:#fff;transition:left .18s}
+.sw.on{background:var(--blue)}
+.sw.on::after{left:21px}
+.tag{font-size:10.5px;padding:2px 7px;border-radius:6px;background:#2a2a35;color:var(--tx2);
+  margin-left:6px;vertical-align:1px}
+.tag.lossy{background:#3a2a12;color:#ffb066}
 </style>
 </head>
 <body>
@@ -226,6 +254,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
         <button class="tb">▤ 资产库</button>
         <button class="tb">☆ 只看星标</button>
         <button class="tb dl">⤓ 批量下载</button>
+        <button class="tb gear" id="gear" title="设置（Cache-DiT 加速）" aria-label="设置">⚙</button>
       </div>
       <div class="settings">
         <span class="pill" id="health"><span class="dot" id="hdot"></span><span id="htxt">连接中…</span></span>
@@ -239,9 +268,52 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   </section>
 </main>
 
+<!-- ============ settings modal ============ -->
+<div class="mask" id="mask">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="设置">
+    <div class="mh">设置 <button class="x" id="mclose" aria-label="关闭">✕</button></div>
+    <div class="mb">
+      <div class="opt">
+        <div class="txt">
+          <div class="t">Cache-DiT 加速 <span class="tag lossy">有损</span></div>
+          <div class="d">跳过部分 DiT block 的重复计算，并把跳过的 block 留在主机内存不参与流式加载，
+            明显缩短生成时间；代价是细节与运动连续性会略有下降。</div>
+        </div>
+        <button class="sw" id="swCacheDit" role="switch" aria-checked="true"></button>
+      </div>
+      <div class="opt">
+        <div class="txt">
+          <div class="t">生效方式</div>
+          <div class="d">按请求即时生效（SGLang 在 batch 边界惰性挂载/卸载），切换后无需重启模型服务。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 const $ = s => document.querySelector(s);
-const S = { res:768, aspect:'16:9', steps:8, dur:4, base:'', jobs:new Map() };
+const S = { res:768, aspect:'16:9', steps:8, dur:4, base:'', jobs:new Map(),
+            // Cache-DiT: default ON (localStorage '0' is the only opt-out)
+            cacheDit: localStorage.getItem('h3.cacheDit') !== '0' };
+
+/* ---------------- settings (gear) ---------------- */
+function renderCacheDit(){
+  const sw = $('#swCacheDit');
+  sw.classList.toggle('on', S.cacheDit);
+  sw.setAttribute('aria-checked', String(S.cacheDit));
+}
+function openSettings(){ renderCacheDit(); $('#mask').classList.add('on'); }
+function closeSettings(){ $('#mask').classList.remove('on'); }
+$('#gear').onclick = openSettings;
+$('#mclose').onclick = closeSettings;
+$('#mask').addEventListener('click', e => { if(e.target === $('#mask')) closeSettings(); });
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeSettings(); });
+$('#swCacheDit').onclick = () => {
+  S.cacheDit = !S.cacheDit;
+  localStorage.setItem('h3.cacheDit', S.cacheDit ? '1' : '0');
+  renderCacheDit();
+};
 
 /* ---------------- base url ---------------- */
 async function initBase(){
@@ -331,6 +403,7 @@ $('#go').onclick = async () => {
       prompt, short_edge:S.res, aspect_ratio:S.aspect,
       duration_seconds:S.dur, num_inference_steps:S.steps,
       conditions:Object.values(conds),
+      enable_cache_dit:S.cacheDit,
     };
     const r = await fetch(S.base+'/api/generate', {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -390,6 +463,7 @@ async function poll(vid, card, payload){
          <div class="meta">
            <span>${payload.short_edge}P</span><span>${payload.aspect_ratio}</span>
            <span>${payload.duration_seconds}s</span><span>${payload.num_inference_steps} steps</span>
+           <span>Cache-DiT ${payload.enable_cache_dit?'开':'关'}</span>
            ${j.inference_time_s?`<span>推理 ${(+j.inference_time_s).toFixed(0)}s</span>`:''}
            ${j.peak_memory_mb?`<span>峰值 ${(j.peak_memory_mb/1024).toFixed(1)}GB</span>`:''}
          </div>`;
