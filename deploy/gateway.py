@@ -193,7 +193,7 @@ async def generate(request: Request) -> JSONResponse:
     if st.get("current") != want:
         _start_switch(want)
         return JSONResponse({"switching": True, "target": want,
-                             "message": f"正在切换到 {want} 分区（需重新加载模型，约 3–5 分钟）…"},
+                             "message": f"正在切换到 {want} 分区（需重新加载模型，实测约 6 分钟）…"},
                             status_code=202)
 
     if want == "ref2va":
