@@ -129,36 +129,41 @@ Then write the printed `https://*.trycloudflare.com` into this repo's
 `api.json` (`{"base": "..."}`). The page reads `api.json` on load, so a new
 tunnel URL only needs that one file updated.
 
-## Settings (gear) — Cache-DiT acceleration
+## Partitions: 文/图生视频 vs 多参考
 
-The toolbar's gear button opens a small settings dialog. Its one switch,
-**Cache-DiT 加速**, is **on by default** and is a real per-request SGLang
-switch (`enable_cache_dit`), mounted/unmounted lazily at the batch boundary —
-toggling it needs no model reload.
+MiniMax-H3 ships two **mutually exclusive** checkpoint partitions and one
+instance serves only one of them:
 
-Cache-DiT is *lossy*: it reuses DiT blocks whose residual between adjacent
-denoising steps is small (DBCache) instead of recomputing them.
+| UI tab | `--model-variant` | `task` | Conditioning |
+| --- | --- | --- | --- |
+| 文/图生视频 | `fl2va` | `t2va` / `fl2va` | text, first/last keyframe |
+| 多参考 | `ref2va` | `ref2va` | up to 9 reference images |
 
-Measured on this deployment (768P, 4 s, 4 steps, one L4):
+`Ref2VA/model_index.json` declares `_minimax_h3.tasks = ["ref2va"]`, so a
+reference request cannot be served by an fl2va instance. On a single 24 GB card
+both partitions cannot be resident at once (each needs ~35 GB of host memory for
+offload plus its own VRAM working set), so the deployment **swaps** them.
 
-| Cache-DiT | DBCache config | Denoise | Total inference |
-| --- | --- | ---: | ---: |
-| off | — | 147.1 s | 193.3 s |
-| on | `W=1 R=0.24` (library defaults scaled) | 147.4 s | 194.6 s |
-| on | `W=1 R=0.6` (**gateway default**) | 99.2 s | **146.7 s** |
+How the swap works:
 
-The library's default residual threshold (0.24) never triggers on a short
-schedule, which makes the switch look inert. The gateway therefore applies
-`max_warmup_steps = clamp(steps // 4, 1, 4)`, `residual_diff_threshold = 0.6`
-and `max_continuous_cached_steps = 3` whenever the switch is on, unless the
-client supplies explicit `cache_dit_params` (accepted keys:
-`Fn_compute_blocks`, `Bn_compute_blocks`, `max_warmup_steps`,
-`residual_diff_threshold`, `max_continuous_cached_steps`, `enable_taylorseer`,
-`taylorseer_order`, `scm_*`).
+- `serve_variant.sh <fl2va|ref2va>` serves one partition; the GGUF weight and
+  `--model-variant` are chosen from the argument, and `--model-path` stays the
+  shared local root (`--model-variant` makes SGLang resolve `FL2VA/` or
+  `Ref2VA/` inside it).
+- `switch_variant.sh <variant>` kills the current server, starts the other, and
+  polls `/health` until it returns 200 (loading + warmup, ~3–5 min). It writes
+  `/content/h3/variant.json` = `{current, state: switching|ready|error, target}`
+  as it goes.
+- The gateway reads that file and reloads *lazily on demand*: a request whose
+  conditions include `role: "reference"` needs `ref2va`, so `/api/generate`
+  returns `{"switching": true, "target": "ref2va"}` (HTTP 202) instead of
+  submitting. The web UI shows the switch progress, waits on `/api/variant`,
+  then re-submits the same job automatically. After the swap the partition stays
+  resident, so subsequent reference jobs run immediately.
+- `GET /api/variant` reports the state; `POST /api/variant {"variant": "..."}`
+  requests a swap explicitly.
 
-Note: sending `quality` on the request selects H3's own `"high"` cache mode and
-suppresses the generic Cache-DiT path, so the gateway only forwards `quality`
-when the switch is off.
+Only the first reference job pays the reload cost.
 
 ## API (gateway)
 
